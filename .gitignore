@@ -1,0 +1,8 @@
+config.json
+memory/
+books/
+__pycache__/
+*.pyc
+dist/
+build/
+*.spec
