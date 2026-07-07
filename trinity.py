@@ -77,31 +77,24 @@ def clear_memory(child_name):
         path.unlink()
 
 def memory_to_prompt(memory, child_name):
-    """Μετατρέπει τη μνήμη σε text για το system prompt"""
     if not memory["last_session"]:
         return ""
-
     lines = [f"\nΜΝΗΜΗ ΠΡΟΗΓΟΥΜΕΝΩΝ ΣΥΝΕΔΡΙΩΝ για τον {child_name}:"]
     lines.append(f"Τελευταία συνεδρία: {memory['last_session']}")
-
     if memory["last_books"]:
         lines.append("Τελευταίες σελίδες ανά βιβλίο:")
         for b in memory["last_books"]:
             lines.append(f"  - {b['book']}: σελίδα {b['last_page']}")
-
     if memory["difficult_topics"]:
         lines.append("Θέματα που δυσκολεύτηκε:")
         for t in memory["difficult_topics"]:
             lines.append(f"  - {t}")
-
     if memory["notes"]:
         lines.append(f"Σημειώσεις: {memory['notes']}")
-
     lines.append("\nΞΕΚΙΝΑ τη συνεδρία θυμίζοντας πού μείνατε και ρώτα αν θέλει να συνεχίσει από εκεί.")
     return "\n".join(lines)
 
 def extract_memory_update(child_name, conversation_history, current_memory):
-    """Ζητά από Claude να εξάγει μνήμη από τη συνεδρία"""
     try:
         summary_prompt = f"""Ανάλυσε αυτή τη συνεδρία μαθήματος και εξήγαγε:
 1. Ποιες σελίδες από ποια βιβλία έγιναν (format: [{{"book": "όνομα", "last_page": αριθμός}}])
@@ -123,12 +116,11 @@ def extract_memory_update(child_name, conversation_history, current_memory):
         )
 
         text = response.content[0].text.strip()
-        # Καθάρισε JSON
         if "```" in text:
             text = text.split("```")[1]
             if text.startswith("json"):
                 text = text[4:]
-        
+
         update = json.loads(text)
         current_memory["last_session"] = datetime.date.today().strftime("%d/%m/%Y")
         current_memory["last_books"] = update.get("last_books", current_memory["last_books"])
@@ -137,7 +129,6 @@ def extract_memory_update(child_name, conversation_history, current_memory):
         return current_memory
 
     except Exception as e:
-        # Αν αποτύχει, αποθήκευσε τουλάχιστον την ημερομηνία
         current_memory["last_session"] = datetime.date.today().strftime("%d/%m/%Y")
         return current_memory
 
@@ -161,7 +152,7 @@ def read_pdf_pages(pdf_path, start_page=None, end_page=None):
         if start_page is None:
             start_page = 1
         if end_page is None:
-            end_page = min(start_page + 2, total_pages)
+            end_page = min(start_page + 1, total_pages)
         start_idx = max(0, start_page - 1)
         end_idx   = min(total_pages - 1, end_page - 1)
         text = ""
@@ -263,6 +254,17 @@ PROMPTS = {
 - Αποδέχεσαι κατάλαβα χωρίς επαλήθευση
 - Δείχνεις ανυπομονησία
 
+Για ερωτήσεις χωρίς βιβλίο:
+Σωκρατική προσέγγιση για γενικές ερωτήσεις:
+Όταν ο Πέτρος ρωτά κάτι γενικό — επιστήμη, γεωγραφία, ιστορία, φύση — δεν απαντάς αμέσως. Αντ' αυτού:
+1. Ρωτάς τι ήδη ξέρει ή τι νομίζει για αυτό
+2. Χτίζεις πάνω στην απάντησή του — επαινείς ό,τι είναι σωστό
+3. Με μία ερώτηση τον οδηγείς λίγο παραπέρα
+4. Μόνο αν κολλήσει εντελώς δίνεις μια μικρή υπόδειξη — ποτέ την πλήρη απάντηση
+
+Στόχος δεν είναι να ξέρει την απάντηση — είναι να μάθει να σκέφτεται πώς να τη βρει.
+
+
 ΤΟΝΟΣ ΚΑΙ ΓΛΩΣΣΑ — ΥΠΟΧΡΕΩΤΙΚΟ:
 Μιλάς σαν φιλικός μεγαλύτερος αδερφός — όχι σαν δάσκαλος.
 Χρησιμοποιείς απλές, σύντομες προτάσεις.
@@ -311,6 +313,16 @@ PROMPTS = {
 - Αποδέχεσαι κατάλαβα χωρίς επαλήθευση
 - Λες ποτέ λάθος — πάντα σχεδόν, ας το δούμε πάλι
 - Δείχνεις ανυπομονησία
+
+Για ερωτήσεις χωρίς βιβλίο:
+Σωκρατική προσέγγιση για γενικές ερωτήσεις:
+Όταν ο Έκτορας ρωτά κάτι γενικό, δεν απαντάς αμέσως. Αλλά κρατάς τη διαδικασία απλή και γρήγορη:
+1. Ρωτάς μία μόνο απλή ερώτηση: "Τι νομίζεις εσύ;"
+2. Αν απαντήσει — έστω και λάθος — το χρησιμοποιείς σαν αφετηρία
+3. Μετά από 1-2 ερωτήσεις το πολύ, δίνεις την απάντηση με απλά λόγια
+4. Τελειώνεις πάντα με κάτι που του δίνει αίσθηση επιτυχίας
+
+Ο Έκτορας χρειάζεται να νιώθει ότι κατάλαβε — όχι ότι εξετάστηκε.
 
 ΤΟΝΟΣ ΚΑΙ ΓΛΩΣΣΑ — ΥΠΟΧΡΕΩΤΙΚΟ:
 Μιλάς σαν αγαπημένη θεία — ζεστά, απλά, χαρούμενα.
@@ -550,7 +562,9 @@ class TrinityApp:
         self.current_folder = None
         self.current_memory = None
         self.session_active = False
-        self.pulse = None
+        self.muted          = False
+        self.pulse          = None
+        self.mute_btn       = None
 
         self.build_home()
 
@@ -611,7 +625,6 @@ class TrinityApp:
                  font=("Segoe UI", 26, "bold"),
                  bg="#0a0a1a", fg="#c8c8ff").pack(side="left")
 
-        # Κουμπί Αρχική
         tk.Button(
             header, text="🏠  Αρχική",
             font=("Segoe UI", 13),
@@ -622,7 +635,17 @@ class TrinityApp:
             command=self.go_home
         ).pack(side="right", padx=(5, 0))
 
-        # Κουμπί Διαγραφή Μνήμης
+        self.mute_btn = tk.Button(
+            header, text="🎤  Μικρόφωνο ON",
+            font=("Segoe UI", 13),
+            bg="#224422", fg="#88ff88",
+            activebackground="#336633",
+            relief="flat", cursor="hand2",
+            padx=14, pady=5,
+            command=self.toggle_mute
+        )
+        self.mute_btn.pack(side="right", padx=(5, 0))
+
         tk.Button(
             header, text="🗑️  Διαγραφή Μνήμης",
             font=("Segoe UI", 12),
@@ -709,6 +732,23 @@ class TrinityApp:
         self.status_label.config(text=text, fg=color)
         self.root.update()
 
+    def trim_history(self):
+        if len(self.conversation_history) > 10:
+            self.conversation_history = self.conversation_history[-10:]
+
+    def toggle_mute(self):
+        self.muted = not self.muted
+        if self.muted:
+            self.mute_btn.config(
+                text="🔇  Μικρόφωνο OFF",
+                bg="#442222", fg="#ff8888"
+            )
+        else:
+            self.mute_btn.config(
+                text="🎤  Μικρόφωνο ON",
+                bg="#224422", fg="#88ff88"
+            )
+
     def confirm_clear_memory(self):
         pin_window = tk.Toplevel(self.root)
         pin_window.title("Επαλήθευση PIN")
@@ -779,13 +819,14 @@ class TrinityApp:
         self.current_memory = load_memory(child_name)
         self.conversation_history = []
         self.session_active = True
+        self.muted = False
 
         self.build_session(child_display)
         threading.Thread(target=self.run_session, daemon=True).start()
 
     def run_session(self):
         available_books = get_available_books(self.current_folder)
-        self.page_cache = {}  # Cache για σελίδες
+        self.page_cache = {}
         memory_text     = memory_to_prompt(self.current_memory, self.current_child)
 
         tools_prompt = f"""
@@ -808,7 +849,6 @@ READ_BOOK:keyword:start_page:end_page
 
         full_prompt = self.current_prompt + tools_prompt
 
-        # Εμφάνισε μνήμη αν υπάρχει
         if self.current_memory["last_session"]:
             mem_summary = f"Τελευταία συνεδρία: {self.current_memory['last_session']}"
             if self.current_memory["last_books"]:
@@ -832,6 +872,16 @@ READ_BOOK:keyword:start_page:end_page
             self.pulse.set_mode("idle")
 
         while self.session_active:
+            # Έλεγξε αν είναι muted
+            while self.muted and self.session_active:
+                self.set_status("🔇  Μικρόφωνο σε σίγαση...", "#ff8888")
+                if self.pulse:
+                    self.pulse.set_mode("idle")
+                time.sleep(0.2)
+
+            if not self.session_active:
+                break
+
             self.set_status("🎤  Σε ακούω...", "#00cc66")
             if self.pulse:
                 self.pulse.set_mode("listening")
@@ -857,16 +907,6 @@ READ_BOOK:keyword:start_page:end_page
                 self.conversation_history.append({
                     "role": "user", "content": user_text
                 })
-
-                self.trim_history()
-                self.set_status("🧠  Trinity σκέφτεται...", "#00ccaa")
-
-                response = anthropic_client.messages.create(
-                    model="claude-sonnet-4-6",
-                    max_tokens=700,
-                    system=full_prompt,
-                    messages=self.conversation_history
-                )
 
                 self.trim_history()
                 self.set_status("🧠  Trinity σκέφτεται...", "#00ccaa")
@@ -941,9 +981,9 @@ READ_BOOK:keyword:start_page:end_page
                 self.set_status(f"⚠️  Σφάλμα: {str(e)[:80]}", "#ef5350")
                 if self.pulse:
                     self.pulse.set_mode("idle")
+
     def go_home(self):
         self.session_active = False
-        # Αποθήκευσε μνήμη πριν φύγεις
         if self.current_name and self.conversation_history:
             self.set_status("💾  Αποθηκεύω μνήμη...", "#aaaaff")
             updated_memory = extract_memory_update(
